@@ -1,31 +1,16 @@
 #include <stdio.h>
 
+
+#include "differ.h"
+#include "recursive_descent.h"
+
 const char* s = NULL;
 
-int GetG(const char* str);
-
-int GetN();
-
-int GetE();
-
-int GetT();
-
-int GetP();
-
-
-
-int main()
-{
-    GetG("11*((50-30)/10)");
-
-    return 0;
-}
-
-int GetG(const char* str)
+int GetG(tree_t* tree, const char* str)
 {
     s = str;
 
-    int val = GetE();
+    elem_s* root = GetE();
 
     if (*s == '\0')
     {
@@ -36,10 +21,14 @@ int GetG(const char* str)
         printf("Syntax error: %c\n", *s);
     }
 
-    printf("RESULT: %d\n", val);
+    printf("ROOT: %p\n", root);
+
+    tree->Ptr = root;
+
+    return 0;
 }
 
-int GetN()
+elem_s* GetN()
 {
     int val = 0;
 
@@ -56,66 +45,73 @@ int GetN()
         printf("N fail\n");
     }
 
-    return val;
+    return CreateNode(NODE_VAL, {.num_val = val});
 }
 
-int GetE()
+elem_s* GetE()
 {
-    int val = GetT();
+    elem_s* op_node = GetT();
 
     while (*s == '+' || *s == '-')
     {
         char op = *s;
         s++;
 
-        int val2 = GetT();
+        elem_s* r_node = GetT();
+        elem_s* l_node = op_node;
 
         if (op == '+')
         {
-            val += val2;
+            op_node = CreateNode(NODE_OP, {.op_val = '+'});
         }
         else
         {
-            val -= val2;
+            op_node = CreateNode(NODE_OP, {.op_val = '-'});
         }
+
+        ConnectNodes(op_node, l_node, LEFT);
+        ConnectNodes(op_node, r_node, RIGHT);
     }
 
-    return val;
+    return op_node;
 }
 
-int GetT()
+elem_s* GetT()
 {
-    int val = GetP();
+    elem_s* op_node = GetP();
 
     while (*s == '*' || *s == '/')
     {
         char op = *s;
         s++;
 
-        int val2 = GetP();
-
+        elem_s* r_node = GetP();
+        elem_s* l_node = op_node;
         if (op == '*')
         {
-            val *= val2;
+            op_node = CreateNode(NODE_OP, {.op_val = '*'});
         }
         else
         {
-            val /= val2;
+            op_node = CreateNode(NODE_OP, {.op_val = '/'});
         }
+
+        ConnectNodes(op_node, l_node, LEFT);
+        ConnectNodes(op_node, r_node, RIGHT);
     }
 
-    return val;
+    return op_node;
 }
 
-int GetP()
+elem_s* GetP()
 {
-    int val = 0;
+    elem_s* node = 0;
 
     if (*s == '(')
     {
         s++;
 
-        val = GetE();
+        node = GetE();
 
         if (*s == ')')
         {
@@ -130,8 +126,8 @@ int GetP()
     }
     else
     {
-        val = GetN();
+        node = GetN();
     }
 
-    return val;
+    return node;
 }
