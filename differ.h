@@ -33,7 +33,7 @@ typedef int elem_t;
 
 enum OPERATIONS
 {
-    OP_ADD = 'DAA',
+    OP_ADD = 'DDA',
     OP_SUB = 'BUS',
     OP_MUL = 'LUM',
     OP_DIV = 'VID',
@@ -97,6 +97,29 @@ typedef struct tree_info
 elem_s* CreateNode(size_t type, union value_t value);
 
 int ConnectNodes(elem_s* parent, elem_s* son, size_t num_son);
+
+elem_s* Diff(elem_s* node);
+
+elem_s* DiffOperation(elem_s* node, elem_s* dest_node);
+
+elem_s* DiffAddSub(elem_s* node, elem_s* dest_node);
+
+elem_s* DiffMul(elem_s* node, elem_s* dest_node);
+
+elem_s* DiffDiv(elem_s* node, elem_s* dest_node);
+
+elem_s* DiffDeg(elem_s* node, elem_s* dest_node);
+
+elem_s* CopyNode(elem_s* node);
+
+int SimplifyMul(elem_s* node);
+
+int CalculateConsts(elem_s* node);
+
+void CheckForConst(elem_s* node, elem_s* son_check, elem_s* other_son);
+
+
+int FreeNode(elem_s* node);
 
 
 

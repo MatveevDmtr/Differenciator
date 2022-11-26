@@ -5,6 +5,10 @@
 
 int GetG(tree_t* tree, const char* str);
 
+elem_s* GetDeg();
+
+elem_s* GetX();
+
 elem_s* GetN();
 
 elem_s* GetE();

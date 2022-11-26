@@ -21,8 +21,6 @@ int GetG(tree_t* tree, const char* str)
         printf("Syntax error: %c\n", *s);
     }
 
-    printf("ROOT: %p\n", root);
-
     tree->Ptr = root;
 
     return 0;
@@ -42,10 +40,47 @@ elem_s* GetN()
 
     if (s == prev_s)
     {
-        printf("N fail\n");
+        return GetX();
     }
 
     return CreateNode(NODE_VAL, {.num_val = val});
+}
+
+elem_s* GetX()
+{
+    if (*s == 'x')
+    {
+        s++;
+
+        return CreateNode(NODE_VAR, {.var_val = 'x'});
+    }
+    else
+    {
+        printf("x not found\n");
+
+        return NULL;
+    }
+}
+
+elem_s* GetDeg()
+{
+    elem_s* op_node = GetP();
+
+    while (*s == '^')
+    {
+        char op = *s;
+        s++;
+
+        elem_s* r_node = GetP();
+        elem_s* l_node = op_node;
+
+        op_node = CreateNode(NODE_OP, {.op_val = OP_DEG});
+
+        ConnectNodes(op_node, l_node, LEFT);
+        ConnectNodes(op_node, r_node, RIGHT);
+    }
+
+    return op_node;
 }
 
 elem_s* GetE()
@@ -62,11 +97,11 @@ elem_s* GetE()
 
         if (op == '+')
         {
-            op_node = CreateNode(NODE_OP, {.op_val = '+'});
+            op_node = CreateNode(NODE_OP, {.op_val = OP_ADD});
         }
         else
         {
-            op_node = CreateNode(NODE_OP, {.op_val = '-'});
+            op_node = CreateNode(NODE_OP, {.op_val = OP_SUB});
         }
 
         ConnectNodes(op_node, l_node, LEFT);
@@ -78,22 +113,22 @@ elem_s* GetE()
 
 elem_s* GetT()
 {
-    elem_s* op_node = GetP();
+    elem_s* op_node = GetDeg();
 
     while (*s == '*' || *s == '/')
     {
         char op = *s;
         s++;
 
-        elem_s* r_node = GetP();
+        elem_s* r_node = GetDeg();
         elem_s* l_node = op_node;
         if (op == '*')
         {
-            op_node = CreateNode(NODE_OP, {.op_val = '*'});
+            op_node = CreateNode(NODE_OP, {.op_val = OP_MUL});
         }
         else
         {
-            op_node = CreateNode(NODE_OP, {.op_val = '/'});
+            op_node = CreateNode(NODE_OP, {.op_val = OP_DIV});
         }
 
         ConnectNodes(op_node, l_node, LEFT);
