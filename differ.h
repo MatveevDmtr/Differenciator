@@ -25,6 +25,83 @@
 // FINISH DUMP DSL
 
 #define MAX_LEN_ELEM 100// to insert in scanf
+//start DSL
+#define CopyL CopyNode(node->left)
+#define CopyR CopyNode(node->right)
+
+#define DiffL Diff(node->left)
+#define DiffR Diff(node->right)
+
+#define NewOp(op)   CreateNode(NODE_OP , {.op_val  = op})
+#define NewNum(num) CreateNode(NODE_VAL, {.num_val = num})
+
+#define UpdSon(new_node)                                                                   \
+{                                                                                          \
+    if      (node->parent->left  == node)   ConnectNodes(node->parent, new_node, LEFT);    \
+    else if (node->parent->right == node)   ConnectNodes(node->parent, new_node, RIGHT);   \
+    else                                    print_log(FRAMED, "Invalid node Connection");  \
+}
+
+#define TexPrint(text)  fprintf(texfile, text);
+#define TexLeft         NodeToTex(texfile, node->left)
+#define TexRight        NodeToTex(texfile, node->right)
+
+#define InOrdCmd(str)                                         \
+{                                                             \
+    strcpy(texcmd, str);                                      \
+    TexLeft;                                                  \
+    TexPrint(texcmd);                                         \
+    TexRight;                                                 \
+}
+
+#define BraceInOrdTrigOp(str)                                 \
+{                                                             \
+    TexPrint(" {(");                                          \
+    TexPrint(str);                                            \
+    if (node->right->type == NODE_OP)   TexPrint("(");        \
+    TexRight;                                                 \
+    if (node->right->type == NODE_OP)   TexPrint(")");        \
+    TexPrint("})} ");                                         \
+}
+
+#define NoBraceInOrdTrigOp(str)                               \
+{                                                             \
+    TexPrint(" {");                                           \
+    TexPrint(str);                                            \
+    if (node->right->type == NODE_OP)   TexPrint("(");        \
+    TexRight;                                                 \
+    if (node->right->type == NODE_OP)   TexPrint(")");        \
+    TexPrint("}} ");                                          \
+}
+
+#define BraceDeg(str)                                         \
+{                                                             \
+    TexPrint("({");                                           \
+    TexLeft;                                                  \
+    TexPrint("}");                                            \
+    TexPrint(str);                                            \
+    TexRight;                                                 \
+    TexPrint("})");                                           \
+}
+
+#define NoBraceDeg(str)                                       \
+{                                                             \
+    TexPrint("{");                                            \
+    TexLeft;                                                  \
+    TexPrint("}");                                            \
+    TexPrint(str);                                            \
+    TexRight;                                                 \
+    TexPrint("}");                                            \
+}
+
+#define TexTrigOp(str)                                                      \
+{                                                                           \
+    if (node->parent->type == NODE_OP &&                                    \
+        node->parent->value.op_val == OP_DEG) {BraceInOrdTrigOp(str);}      \
+    else                                      {NoBraceInOrdTrigOp(str);}    \
+}
+//finish DSL
+
 
 
 typedef unsigned long long bird_t;
@@ -33,11 +110,21 @@ typedef int elem_t;
 
 enum OPERATIONS
 {
-    OP_ADD = 'DDA',
-    OP_SUB = 'BUS',
-    OP_MUL = 'LUM',
-    OP_DIV = 'VID',
-    OP_DEG = 'GED'
+    OP_ADD    = 'DDA',
+    OP_SUB    = 'BUS',
+    OP_MUL    = 'LUM',
+    OP_DIV    = 'VID',
+    OP_DEG    = 'GED',
+    OP_SIN    = 'NIS',
+    OP_COS    = 'SOC',
+    OP_TG     = 'GT' ,
+    OP_CTG    = 'GTC',
+    OP_SH     = 'HS' ,
+    OP_CH     = 'HC' ,
+    OP_ARCSIN = 'NSA',
+    OP_ARCCOS = 'SCA',
+    OP_ARCTG  = 'GTA',
+    OP_ARCCTG = 'GCA',
 };
 
 enum NUM_SONS
@@ -110,13 +197,37 @@ elem_s* DiffDiv(elem_s* node, elem_s* dest_node);
 
 elem_s* DiffDeg(elem_s* node, elem_s* dest_node);
 
+elem_s* DiffSinCos(elem_s* node, elem_s* dest_node);
+
+elem_s* DiffTgCtg(elem_s* node, elem_s* dest_node);
+
 elem_s* CopyNode(elem_s* node);
 
-int SimplifyMul(elem_s* node);
+int OneIterationSimplify(elem_s* node, bool* if_simple);
 
-int CalculateConsts(elem_s* node);
+int CalculateConsts(elem_s* node, bool* if_simple);
 
-void CheckForConst(elem_s* node, elem_s* son_check, elem_s* other_son);
+int CheckForConst(elem_s* node, elem_s* son_check, elem_s* other_son, bool* if_simple);
+
+int CheckForAddSubConst(elem_s* node, elem_s* son_check, elem_s* other_son);
+
+int SimplifyAddSub(elem_s* node);
+
+int TreeSimplify(tree_t* tree);
+
+elem_s* NewNodeForOpWithOne(size_t op_val, elem_s* other_son);
+
+elem_s* NewNodeForOpWithZero(size_t op_val, elem_s* other_son);
+
+int TreeToTex(FILE* texfile, tree_t* tree);
+
+int NodeToTex(FILE* texfile, elem_s* node);
+
+int GetNDeriv(FILE* texfile, tree_t* tree, size_t max_deriv);
+
+FILE* TexStart();
+
+int TexFinish(FILE* texfile);
 
 
 int FreeNode(elem_s* node);
@@ -187,9 +298,5 @@ int HTMLDump(const tree_t* tree, const char* occasion);
 int LogCritError(int errcode, const char* func, int line);
 
 int TreeRecalloc(tree_t* tree, size_t mode);
-
-int YesOrNo();
-
-void PrintBinQuest();
 
 #endif //guard

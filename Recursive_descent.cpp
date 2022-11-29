@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <string.h>
 
 
 #include "differ.h"
@@ -44,6 +45,81 @@ elem_s* GetN()
     }
 
     return CreateNode(NODE_VAL, {.num_val = val});
+}
+
+elem_s* GetTrig()
+{
+    elem_s* op_node = GetDeg();
+
+    size_t op_val = 0;
+
+    while (op_val = TypeOfTrigF(&s))
+    {
+        elem_s* r_node = GetDeg();
+        elem_s* l_node = NewNum(0);
+
+        op_node = NewOp(op_val);
+
+        ConnectNodes(op_node, l_node, LEFT);
+        ConnectNodes(op_node, r_node, RIGHT);
+    }
+
+    return op_node;
+}
+
+size_t TypeOfTrigF(const char** s)
+{
+    if      (!strncmp(*s, "sin", 3))
+    {
+        *s += 3;
+        return OP_SIN;
+    }
+    else if (!strncmp(*s, "cos", 3))
+    {
+        *s += 3;
+        return OP_COS;
+    }
+    else if (!strncmp(*s, "tg", 2))
+    {
+        *s += 2;
+        return OP_TG;
+    }
+    else if (!strncmp(*s, "ctg", 3))
+    {
+        *s += 3;
+        return OP_CTG;
+    }
+    else if (!strncmp(*s, "sh", 2))
+    {
+        *s += 2;
+        return OP_SH;
+    }
+    else if (!strncmp(*s, "ch", 2))
+    {
+        *s += 2;
+        return OP_CH;
+    }
+    else if (!strncmp(*s, "arcsin", 6))
+    {
+        *s += 6;
+        return OP_ARCSIN;
+    }
+    else if (!strncmp(*s, "arccos", 6))
+    {
+        *s += 6;
+        return OP_ARCCOS;
+    }
+    else if (!strncmp(*s, "arctg", 5))
+    {
+        *s += 5;
+        return OP_ARCTG;
+    }
+    else if (!strncmp(*s, "arcctg", 6))
+    {
+        *s += 6;
+        return OP_ARCCTG;
+    }
+    else    return 0;
 }
 
 elem_s* GetX()
@@ -113,14 +189,14 @@ elem_s* GetE()
 
 elem_s* GetT()
 {
-    elem_s* op_node = GetDeg();
+    elem_s* op_node = GetTrig();
 
     while (*s == '*' || *s == '/')
     {
         char op = *s;
         s++;
 
-        elem_s* r_node = GetDeg();
+        elem_s* r_node = GetTrig();
         elem_s* l_node = op_node;
         if (op == '*')
         {

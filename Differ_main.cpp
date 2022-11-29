@@ -1,6 +1,8 @@
+//#include <TXLib.h>
+
 #include <stdio.h>
 #include <math.h>
-//#include <TXLib.h>
+#include <string.h>
 #define LOGGING
 
 #include "recursive_descent.h"
@@ -18,23 +20,7 @@
 
 #include "D:\\Programming\\C\\Ded_course_1_sem\\Processor_v4\\logging.h"
 
-//start DSL
-#define CopyL CopyNode(node->left)
-#define CopyR CopyNode(node->right)
 
-#define DiffL Diff(node->left)
-#define DiffR Diff(node->right)
-
-#define NewOp(op)   CreateNode(NODE_OP , {.op_val  = op})
-#define NewNum(num) CreateNode(NODE_VAL, {.num_val = num})
-
-#define UpdSon(new_node)                                                                   \
-{                                                                                          \
-    if      (node->parent->left  == node)   ConnectNodes(node->parent, new_node, LEFT);    \
-    else if (node->parent->right == node)   ConnectNodes(node->parent, new_node, RIGHT);   \
-    else                                    print_log(FRAMED, "Invalid node Connection");  \
-}
-//finish DSL
 
 enum ERRCODES
 {
@@ -65,9 +51,20 @@ const size_t MAX_LEN_CONSOLE_CMD = 50;
 const size_t MAX_LEN_NUM_DUMP    = 10;
 const size_t TAB                 = 4;
 const int    PREV_FOR_FREE       = -1;
+const size_t MAX_LEN_TEXCMD      = 10;
 
 const char   QUEST_PREFIX        = '?';
 const char   LEAF_PREFIX         = '#';
+
+const char* TEX_PREVIEW = "\\documentclass[a4paper, 12pt]{article}\n"
+                          "\\usepackage[a4paper,top=1.5cm, bottom=1.5cm, left=1cm, right=1cm]"
+                          "{geometry}\n"
+                          "\\usepackage[utf8]{inputenc}\n"
+                          "\\usepackage{mathtext}                \n"
+                          "\\usepackage[english, russian]{babel} \n"
+                          "\\title{Sanya Loh}\n"
+                          "\\author{Witcherok, DedSquad}\n"
+                          "\\date{\\today}\n";
 
 int main()
 {
@@ -78,7 +75,7 @@ int main()
     tree_t der_tree = StructTreeInit(der_tree);
 
     TreeCtor(&tree);
-    TreeCtor(&der_tree);
+
 
     log("Tree created\n");
     /*
@@ -94,17 +91,15 @@ int main()
     static queue_t way_down_c1 = {.Ptr = temp_ptr_wayd_c1, .Head = 0, .Tail = 0};
     static queue_t way_down_c2 = {.Ptr = temp_ptr_wayd_c2, .Head = 0, .Tail = 0};
     */
-    GetG(&tree, "(2*x)^5");
+    GetG(&tree, "7*x^6");
 
     HTMLDump(&tree, "After reading expression");
 
-    der_tree.Ptr = Diff(tree.Ptr);
+    static FILE* texfile = TexStart();
 
-    SimplifyMul(der_tree.Ptr);
+    GetNDeriv(texfile, &tree, 5);
 
-    CalculateConsts(der_tree.Ptr);
-
-    HTMLDump(&der_tree, "Derivative 1");
+    TexFinish(texfile);
 }
 
 tree_t StructureTreeInit(const char* name,
@@ -123,6 +118,67 @@ tree_t StructureTreeInit(const char* name,
     };
 
     return temp_tree;
+}
+
+FILE* TexStart()
+{
+    FILE* texfile = fopen("Derivative.tex", "w");
+
+    TexPrint(TEX_PREVIEW);
+    TexPrint("\\begin{document}\n");
+    TexPrint("\\maketitle\n");
+
+    return texfile;
+}
+
+int TexFinish(FILE* texfile)
+{
+    TexPrint("\\end{document}\n");
+
+    fclose(texfile);
+
+    return 0;
+}
+
+int GetNDeriv(FILE* texfile, tree_t* tree, size_t max_deriv)
+{
+    static size_t num_deriv = 0;
+
+    if (num_deriv >= max_deriv) return 0;
+
+    tree_t der_tree = StructTreeInit(der_tree);
+
+    TreeCtor(&der_tree);
+
+    der_tree.Ptr = Diff(tree->Ptr);
+
+    HTMLDump(&der_tree, "Derivative");
+
+    TreeSimplify(&der_tree);
+
+    HTMLDump(&der_tree, "After Simplify");
+
+    TreeToTex(texfile, &der_tree);
+
+    num_deriv += 1;
+
+    GetNDeriv(texfile, &der_tree, max_deriv);
+}
+
+int TreeSimplify(tree_t* tree)
+{
+    bool if_simple = false;
+
+    while (!if_simple)
+    {
+        if_simple = true;
+
+        OneIterationSimplify(tree->Ptr, &if_simple);
+
+        CalculateConsts(tree->Ptr, &if_simple);
+    }
+
+    return 0;
 }
 
 elem_s* Diff(elem_s* node)
@@ -180,9 +236,93 @@ elem_s* DiffOperation(elem_s* node, elem_s* dest_node)
             DiffDeg(node, dest_node);
             break;
 
+        case OP_SIN:
+            dest_node->value.op_val = OP_MUL;
+            DiffSinCos(node, dest_node);
+            break;
+
+        case OP_COS:
+            dest_node->value.op_val = OP_MUL;
+            DiffSinCos(node, dest_node);
+            break;
+
+        case OP_TG:
+            dest_node->value.op_val = OP_MUL;
+            DiffTgCtg(node, dest_node);
+            break;
+
+        case OP_CTG:
+            dest_node->value.op_val = OP_MUL;
+            DiffTgCtg(node, dest_node);
+            break;
+
         default:
             print_log(FRAMED, "Unexpected type of operation");
     }
+
+    return dest_node;
+}
+
+elem_s* DiffSinCos(elem_s* node, elem_s* dest_node)
+{
+    elem_s* factor  = NULL;
+    elem_s* trig_op = NULL;
+    elem_s* mul     = NULL;
+
+    if (node->value.op_val == OP_SIN)
+    {
+        mul     = dest_node;
+        trig_op = NewOp(OP_COS);
+    }
+    else
+    {
+        factor  = NewNum(-1);
+        trig_op = NewOp(OP_SIN);
+        mul     = NewOp(OP_MUL);
+
+        ConnectNodes(dest_node, factor, LEFT);
+        ConnectNodes(dest_node, mul,    RIGHT);
+    }
+
+    ConnectNodes(trig_op, NewNum(0), LEFT);
+    ConnectNodes(trig_op, CopyR,     RIGHT);
+
+    ConnectNodes(mul, trig_op, LEFT);
+    ConnectNodes(mul, DiffR,   RIGHT);
+
+    return dest_node;
+}
+
+elem_s* DiffTgCtg(elem_s* node, elem_s* dest_node)
+{
+    elem_s* factor  = NULL;
+    elem_s* trig_op = NULL;
+    elem_s* mul     = NULL;
+    elem_s* deg     = NewOp(OP_DEG);
+
+    if (node->value.op_val == OP_TG)
+    {
+        mul     = dest_node;
+        trig_op = NewOp(OP_COS);
+    }
+    else
+    {
+        factor  = NewNum(-1);
+        trig_op = NewOp(OP_SIN);
+        mul     = NewOp(OP_MUL);
+
+        ConnectNodes(dest_node, factor,  LEFT);
+        ConnectNodes(dest_node, mul,     RIGHT);
+    }
+
+    ConnectNodes(trig_op, NewNum(0), LEFT);
+    ConnectNodes(trig_op, CopyR,     RIGHT);
+
+    ConnectNodes(deg, trig_op,     LEFT);
+    ConnectNodes(deg, NewNum(-2), RIGHT);
+
+    ConnectNodes(mul, deg,   LEFT);
+    ConnectNodes(mul, DiffR, RIGHT);
 
     return dest_node;
 }
@@ -202,6 +342,17 @@ elem_s* DiffMul(elem_s* node, elem_s* dest_node)
     ConnectNodes(mul2, DiffR, RIGHT);
 
     return dest_node;
+}
+
+int TreeToTex(FILE* texfile, tree_t* tree)
+{
+    TexPrint("$$");
+
+    NodeToTex(texfile, tree->Ptr);
+
+    TexPrint("$$\n");
+
+    return 0;
 }
 
 elem_s* DiffDiv(elem_s* node, elem_s* dest_node)
@@ -311,79 +462,11 @@ int TreeCtor(tree_t* tree)
     return 0;
 }
 
-/*
-int WriteNode(elem_s* node, FILE* db, size_t num_spaces)
-{
-    Assert(node == nullptr);
-    Assert(db   == nullptr);
-
-    log("start writing node: %s\n", node->elem);
-
-    WriteSpaces(num_spaces, db);
-
-    if (node->son1 && node->son2)
-    {
-        fprintf(db, "%c%s\n", QUEST_PREFIX, node->elem);
-
-        num_spaces += TAB;
-
-        log("try to write sons of %s\n", node->elem);
-
-        WriteNode(node->son1, db, num_spaces);
-        WriteNode(node->son2, db, num_spaces);
-    }
-    else
-    {
-        log("try to write leaf %s\n", node->elem);
-
-        fprintf(db, "%c%s\n", LEAF_PREFIX, node->elem);
-    }
-
-    return 0;
-}
-
-int WriteDataBase(elem_s* root)
-{
-    log("Start writing db\n");
-
-    Assert(root == nullptr);
-
-    FILE* db = fopen("dataBase.txt", "w");
-
-    if (db == NULL)
-    {
-        SpeakAndPrint("Can't open dataBase file\n");
-
-        return -1;
-    }
-
-    WriteNode(root, db, 0);
-
-    fclose(db);
-
-    log("Finish writing db\n");
-
-    return 0;
-}
-
-void WriteSpaces(int num_spaces, FILE* db)
-{
-    Assert(db == nullptr);
-
-    while (num_spaces-- > 0)
-    {
-        fprintf(db, " ");
-    }
-}
-
-*/
-
-
 elem_s* CreateNode(size_t type, union value_t value)
 {
     elem_s* temp_ptr = allocate_array(elem_s, 1);
 
-    *temp_ptr = {.type   = type,
+    *temp_ptr = {.type  = type,
                 .value  = value,
                 .parent = NULL,
                 .left   = NULL,
@@ -468,19 +551,23 @@ int FindNode(tree_t* tree, elem_s* node, const char* name, queue_t* way_down, si
 
 */
 
-int CalculateConsts(elem_s* node)
+int CalculateConsts(elem_s* node, bool* if_simple)
 {
-    if (node->left )  CalculateConsts(node->left);
-    if (node->right)  CalculateConsts(node->right);
+    if (node->left )  CalculateConsts(node->left, if_simple);
+    if (node->right)  CalculateConsts(node->right, if_simple);
 
     if (node->type != NODE_OP         ||
         node->left ->type != NODE_VAL ||
         node->right->type != NODE_VAL)       return 0;
 
+    *if_simple = false;
+
     int val = 0;
 
     int lval = node->left ->value.num_val;
     int rval = node->right->value.num_val;
+
+    bool update_neccessary = true;
 
     switch(node->value.op_val)
     {
@@ -505,46 +592,177 @@ int CalculateConsts(elem_s* node)
             break;
 
         default:
+            update_neccessary = false;
             print_log(FRAMED, "Unknown Operation");
     }
 
-    UpdSon(NewNum(val));
+    if (update_neccessary)      UpdSon(NewNum(val));
 
     return 0;
 }
 
-int SimplifyMul(elem_s* node)
+/*int SimplifyAddSub(elem_s* node)
 {
-    if (node->left )  SimplifyMul(node->left);
-    if (node->right)  SimplifyMul(node->right);
+    if (node->left )  SimplifyAddSub(node->left);
+    if (node->right)  SimplifyAddSub(node->right);
 
-    if (node->type != NODE_OP || node->value.op_val != OP_MUL)    return 0;
+    if (node->type != NODE_OP        ||
+       (node->value.op_val != OP_ADD &&
+        node->value.op_val != OP_SUB))    return 0;
 
-    CheckForConst(node, node->left , node->right);
-    CheckForConst(node, node->right, node->left);
+    CheckForAddSubConst(node, node->left , node->right);
+    CheckForAddSubConst(node, node->right, node->left);
 
     return 0;
 }
 
-void CheckForConst(elem_s* node, elem_s* son_check, elem_s* other_son)
+int CheckForAddSubConst(elem_s* node, elem_s* son_check, elem_s* other_son)
 {
+    if (node->parent == NULL)       return -1;
+
+    if (son_check &&
+        son_check->type == NODE_VAL &&
+        son_check->value.num_val == 0)
+    {
+        static bool if_simple = true;
+
+        UpdSon(other_son);
+
+        FreeNode(node);
+    }
+}*/
+
+int OneIterationSimplify(elem_s* node, bool* if_simple)
+{
+    if (node->left )  OneIterationSimplify(node->left, if_simple);
+    if (node->right)  OneIterationSimplify(node->right, if_simple);
+
+    if (node->type != NODE_OP)     return 0;
+
+    CheckForConst(node, node->left , node->right, if_simple);
+    CheckForConst(node, node->right, node->left,  if_simple);
+
+    return 0;
+}
+
+int CheckForConst(elem_s* node, elem_s* son_check, elem_s* other_son, bool* if_simple)
+{
+    if (node->parent == NULL)       return -1;
+
     if (son_check && son_check->type == NODE_VAL)
     {
         if (son_check->value.num_val == 0)
         {
-            elem_s* new_node = NewNum(0);
+            *if_simple = false;
 
-            UpdSon(new_node);
+            elem_s* new_node = NewNodeForOpWithZero(node->value.op_val, other_son);
 
-            FreeNode(node);
+            if (new_node)
+            {
+                UpdSon(new_node);
+
+                free(node);
+
+                FreeNode(son_check);
+            }
         }
         else if (son_check->value.num_val == 1)
         {
-            UpdSon(other_son);
+            *if_simple = false;
 
-            FreeNode(node);
+            elem_s* new_node = NewNodeForOpWithOne(node->value.op_val, other_son);
+
+            if (new_node)
+            {
+                UpdSon(NewNodeForOpWithOne(node->value.op_val, other_son));
+
+                free(node);
+
+                FreeNode(son_check);
+            }
         }
     }
+}
+
+elem_s* NewNodeForOpWithOne(size_t op_val, elem_s* other_son)
+{
+    switch(op_val)
+    {
+        case OP_MUL:
+            return other_son;
+            break;
+
+        case OP_DIV:
+            if (other_son->parent->left == other_son)
+            {
+                return other_son;
+            }
+            break;
+
+        case OP_DEG:
+            if (other_son->parent->left == other_son)
+            {
+                return other_son;
+            }
+            else
+            {
+                FreeNode(other_son);
+                return NewNum(1);
+            }
+            break;
+
+        default:
+            log("No meaning for simplify\n");
+    }
+    return NULL;
+}
+
+elem_s* NewNodeForOpWithZero(size_t op_val, elem_s* other_son)
+{
+    switch(op_val)
+    {
+        case OP_MUL:
+            FreeNode(other_son);
+            return NewNum(0);
+            break;
+
+        case OP_DIV:
+            if (other_son->parent->left == other_son)
+            {
+                print_log(FRAMED, "ZERO DIVISION ERROR");
+            }
+            else
+            {
+                FreeNode(other_son);
+                return NewNum(0);
+            }
+            break;
+
+        case OP_ADD:
+            return other_son;
+            break;
+
+        case OP_SUB:
+            return other_son;
+            break;
+
+        case OP_DEG:
+            if (other_son->parent->left == other_son)
+            {
+                FreeNode(other_son);
+                return NewNum(1);
+            }
+            else
+            {
+                FreeNode(other_son);
+                return NewNum(0);
+            }
+            break;
+
+        default:
+            print_log(FRAMED, "Operation Error: unexpected operation");
+    }
+    return NULL;
 }
 
 int FreeNode(elem_s* node)
@@ -638,6 +856,76 @@ int LogCritError(int errcode, const char* func, int line)
     }
 
     return 0;
+}
+
+int NodeToTex(FILE* texfile, elem_s* node)
+{
+    char texcmd[MAX_LEN_TEXCMD] = "";
+
+    if (node->type == NODE_VAR)
+    {
+        texcmd[0] = node->value.var_val;
+        TexPrint(texcmd);
+        return 0;
+    }
+    if (node->type == NODE_VAL)
+    {
+        if(node->value.num_val <= 0)
+        {
+            TexPrint("(");
+            TexPrint(itoa(node->value.num_val, texcmd, 10));
+            TexPrint(")");
+        }
+        else    TexPrint(itoa(node->value.num_val, texcmd, 10));
+        return 0;
+    }
+    switch(node->value.op_val)
+    {
+        case OP_ADD:
+            InOrdCmd(" + ");
+            break;
+
+        case OP_SUB:
+            InOrdCmd(" - ");
+            break;
+
+        case OP_MUL:
+            InOrdCmd(" \\cdot ");
+            break;
+
+        case OP_DIV:
+            TexPrint(" \\frac{");
+            TexLeft;
+            TexPrint("}{");
+            TexRight;
+            TexPrint("} ");
+            break;
+
+        case OP_DEG:
+            if (node->parent->type == NODE_OP &&
+                node->parent->value.op_val == OP_DEG) {BraceDeg("^{");}
+            else                                      {NoBraceDeg("^{");}
+            break;
+
+        case OP_SIN:
+            TexTrigOp("\\sin{");
+            break;
+
+        case OP_COS:
+            TexTrigOp("\\cos{");
+            break;
+
+        case OP_TG:
+            TexTrigOp("\\tg{");
+            break;
+
+        case OP_CTG:
+            TexTrigOp("\\ctg{");
+            break;
+
+        default:
+            print_log(FRAMED, "Unexpected type of operation");
+    }
 }
 
 int HTMLDump(const tree_t* tree, const char* occasion)

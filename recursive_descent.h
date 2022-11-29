@@ -5,6 +5,8 @@
 
 int GetG(tree_t* tree, const char* str);
 
+size_t TypeOfTrigF(const char** s);
+
 elem_s* GetDeg();
 
 elem_s* GetX();
