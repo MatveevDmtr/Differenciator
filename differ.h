@@ -1,6 +1,8 @@
 #ifndef DIFFER_H_INCLUDED
 #define DIFFER_H_INCLUDED
 
+#include <stdarg.h>
+
 #define StructTreeInit(name)                              \
         StructureTreeInit(#name,                          \
                            __PRETTY_FUNCTION__,           \
@@ -37,14 +39,20 @@
 
 #define UpdSon(new_node)                                                                   \
 {                                                                                          \
-    if      (node->parent->left  == node)   ConnectNodes(node->parent, new_node, LEFT);    \
+    if      (node->parent == NULL)          {UpdRoot(new_node);}                           \
+    else if (node->parent->left  == node)   ConnectNodes(node->parent, new_node, LEFT);    \
     else if (node->parent->right == node)   ConnectNodes(node->parent, new_node, RIGHT);   \
     else                                    print_log(FRAMED, "Invalid node Connection");  \
 }
 
-#define TexPrint(text)  fprintf(texfile, text);
-#define TexLeft         NodeToTex(texfile, node->left)
-#define TexRight        NodeToTex(texfile, node->right)
+#define UpdRoot(new_node)                                \
+{                                                        \
+    tree->Ptr = new_node;                                \
+}
+
+#define TexPrint(text...)  TexPrintf(texfile, text);
+#define TexLeft              NodeToTex(texfile, node->left)
+#define TexRight             NodeToTex(texfile, node->right)
 
 #define InOrdCmd(str)                                         \
 {                                                             \
@@ -203,11 +211,13 @@ elem_s* DiffTgCtg(elem_s* node, elem_s* dest_node);
 
 elem_s* CopyNode(elem_s* node);
 
-int OneIterationSimplify(elem_s* node, bool* if_simple);
+int OneIterationSimplify(tree_t* tree, elem_s* node, bool* if_simple);
 
-int CalculateConsts(elem_s* node, bool* if_simple);
+int CalculateConsts(tree_t* tree, elem_s* node, bool* if_simple);
 
-int CheckForConst(elem_s* node, elem_s* son_check, elem_s* other_son, bool* if_simple);
+int CheckForConst(tree_t* tree     , elem_s* node,
+                  elem_s* son_check, elem_s* other_son,
+                  bool* if_simple);
 
 int CheckForAddSubConst(elem_s* node, elem_s* son_check, elem_s* other_son);
 
@@ -228,6 +238,8 @@ int GetNDeriv(FILE* texfile, tree_t* tree, size_t max_deriv);
 FILE* TexStart();
 
 int TexFinish(FILE* texfile);
+
+void TexPrintf(FILE* texfile, const char* format, ...);
 
 
 int FreeNode(elem_s* node);

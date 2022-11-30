@@ -97,6 +97,10 @@ int main()
 
     static FILE* texfile = TexStart();
 
+    TexPrint("$$f(x) = ");
+
+    TreeToTex(texfile, &tree);
+
     GetNDeriv(texfile, &tree, 5);
 
     TexFinish(texfile);
@@ -152,15 +156,17 @@ int GetNDeriv(FILE* texfile, tree_t* tree, size_t max_deriv)
 
     der_tree.Ptr = Diff(tree->Ptr);
 
+    num_deriv += 1;
+
     HTMLDump(&der_tree, "Derivative");
 
     TreeSimplify(&der_tree);
 
     HTMLDump(&der_tree, "After Simplify");
 
-    TreeToTex(texfile, &der_tree);
+    TexPrint("$$f^{(%d)}(x) = ", num_deriv);
 
-    num_deriv += 1;
+    TreeToTex(texfile, &der_tree);
 
     GetNDeriv(texfile, &der_tree, max_deriv);
 }
@@ -173,9 +179,9 @@ int TreeSimplify(tree_t* tree)
     {
         if_simple = true;
 
-        OneIterationSimplify(tree->Ptr, &if_simple);
+        OneIterationSimplify(tree, tree->Ptr, &if_simple);
 
-        CalculateConsts(tree->Ptr, &if_simple);
+        CalculateConsts(tree, tree->Ptr, &if_simple);
     }
 
     return 0;
@@ -346,7 +352,7 @@ elem_s* DiffMul(elem_s* node, elem_s* dest_node)
 
 int TreeToTex(FILE* texfile, tree_t* tree)
 {
-    TexPrint("$$");
+    //TexPrint("$$");
 
     NodeToTex(texfile, tree->Ptr);
 
@@ -551,10 +557,10 @@ int FindNode(tree_t* tree, elem_s* node, const char* name, queue_t* way_down, si
 
 */
 
-int CalculateConsts(elem_s* node, bool* if_simple)
+int CalculateConsts(tree_t* tree, elem_s* node, bool* if_simple)
 {
-    if (node->left )  CalculateConsts(node->left, if_simple);
-    if (node->right)  CalculateConsts(node->right, if_simple);
+    if (node->left )  CalculateConsts(tree, node->left, if_simple);
+    if (node->right)  CalculateConsts(tree, node->right, if_simple);
 
     if (node->type != NODE_OP         ||
         node->left ->type != NODE_VAL ||
@@ -596,9 +602,26 @@ int CalculateConsts(elem_s* node, bool* if_simple)
             print_log(FRAMED, "Unknown Operation");
     }
 
-    if (update_neccessary)      UpdSon(NewNum(val));
+    if (update_neccessary)
+    {
+        UpdSon(NewNum(val));
+        FreeNode(node);
+    }
 
     return 0;
+}
+
+void TexPrintf(FILE* texfile, const char* format, ...)
+{
+    va_list args;
+
+    va_start (args, format);
+
+    vfprintf(texfile, format, args);
+
+    fflush(texfile);
+
+    va_end(args);
 }
 
 /*int SimplifyAddSub(elem_s* node)
@@ -632,22 +655,24 @@ int CheckForAddSubConst(elem_s* node, elem_s* son_check, elem_s* other_son)
     }
 }*/
 
-int OneIterationSimplify(elem_s* node, bool* if_simple)
+int OneIterationSimplify(tree_t* tree, elem_s* node, bool* if_simple)
 {
-    if (node->left )  OneIterationSimplify(node->left, if_simple);
-    if (node->right)  OneIterationSimplify(node->right, if_simple);
+    if (node->left )  OneIterationSimplify(tree, node->left, if_simple);
+    if (node->right)  OneIterationSimplify(tree, node->right, if_simple);
 
     if (node->type != NODE_OP)     return 0;
 
-    CheckForConst(node, node->left , node->right, if_simple);
-    CheckForConst(node, node->right, node->left,  if_simple);
+    CheckForConst(tree, node, node->left , node->right, if_simple);
+    CheckForConst(tree, node, node->right, node->left,  if_simple);
 
     return 0;
 }
 
-int CheckForConst(elem_s* node, elem_s* son_check, elem_s* other_son, bool* if_simple)
+int CheckForConst(tree_t* tree     , elem_s* node,
+                  elem_s* son_check, elem_s* other_son,
+                  bool* if_simple)
 {
-    if (node->parent == NULL)       return -1;
+    //if (node->parent == NULL)       return -1;
 
     if (son_check && son_check->type == NODE_VAL)
     {
