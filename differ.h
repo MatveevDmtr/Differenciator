@@ -20,6 +20,13 @@
     location__;                                                     \
 })
 
+//#define allocate_array(type, num_elems)                             \
+({                                                                  \
+    type* location__ = (type*) calloc (num_elems, sizeof (type));   \
+    Assert(location__ == NULL);                                     \
+    location__;                                                     \
+})
+
 // START DUMP  DSL
 
 #define dumpline(...)  fprintf(dump_file, __VA_ARGS__);
@@ -28,14 +35,22 @@
 
 #define MAX_LEN_ELEM 100// to insert in scanf
 //start DSL
+
+#define MakeSons(node, left_son, right_son)                       \
+{                                                                 \
+    ConnectNodes(node, left_son,  LEFT);                          \
+    ConnectNodes(node, right_son, RIGHT);                         \
+}
+
 #define CopyL CopyNode(node->left)
 #define CopyR CopyNode(node->right)
 
 #define DiffL Diff(node->left)
 #define DiffR Diff(node->right)
 
-#define NewOp(op)   CreateNode(NODE_OP , {.op_val  = op})
-#define NewNum(num) CreateNode(NODE_VAL, {.num_val = num})
+#define NewOp(op)       CreateNode(NODE_OP, {.op_val  = op})
+
+#define NewNum(number)  CreateNode(NODE_VAL, {.num_val = number})
 
 #define UpdSon(new_node)                                                                   \
 {                                                                                          \
@@ -47,18 +62,18 @@
 
 #define UpdRoot(new_node)                                \
 {                                                        \
-    tree->Ptr = new_node;                                \
+    tree->Ptr         = new_node;                        \
+    tree->Ptr->parent = NULL;                            \
 }
 
-#define TexPrint(text...)  TexPrintf(texfile, text);
+#define TexPrint(text...)    TexPrintf(texfile, text);
 #define TexLeft              NodeToTex(texfile, node->left)
 #define TexRight             NodeToTex(texfile, node->right)
 
 #define InOrdCmd(str)                                         \
 {                                                             \
-    strcpy(texcmd, str);                                      \
     TexLeft;                                                  \
-    TexPrint(texcmd);                                         \
+    TexPrint(str);                                            \
     TexRight;                                                 \
 }
 
@@ -85,7 +100,9 @@
 #define BraceDeg(str)                                         \
 {                                                             \
     TexPrint("({");                                           \
+    if (node->left->type == NODE_OP)   TexPrint("(");         \
     TexLeft;                                                  \
+    if (node->left->type == NODE_OP)   TexPrint(")");         \
     TexPrint("}");                                            \
     TexPrint(str);                                            \
     TexRight;                                                 \
@@ -95,19 +112,27 @@
 #define NoBraceDeg(str)                                       \
 {                                                             \
     TexPrint("{");                                            \
+    if (node->left->type == NODE_OP)   TexPrint("(");         \
     TexLeft;                                                  \
+    if (node->left->type == NODE_OP)   TexPrint(")");         \
     TexPrint("}");                                            \
     TexPrint(str);                                            \
     TexRight;                                                 \
     TexPrint("}");                                            \
 }
 
-#define TexTrigOp(str)                                                      \
+//#define TexTrigOp(str)                                                    \
 {                                                                           \
     if (node->parent->type == NODE_OP &&                                    \
         node->parent->value.op_val == OP_DEG) {BraceInOrdTrigOp(str);}      \
     else                                      {NoBraceInOrdTrigOp(str);}    \
 }
+
+#define TexTrigOp(str)                                                      \
+{                                                                           \
+    NoBraceInOrdTrigOp(str);                                                \
+}
+
 //finish DSL
 
 
@@ -235,6 +260,8 @@ int NodeToTex(FILE* texfile, elem_s* node);
 
 int GetNDeriv(FILE* texfile, tree_t* tree, size_t max_deriv);
 
+int TaylorPrint(FILE* texfile, tree_t* tree, size_t max_deriv);
+
 FILE* TexStart();
 
 int TexFinish(FILE* texfile);
@@ -243,6 +270,8 @@ void TexPrintf(FILE* texfile, const char* format, ...);
 
 
 int FreeNode(elem_s* node);
+
+int FreeOneNode(elem_s* node);
 
 
 
